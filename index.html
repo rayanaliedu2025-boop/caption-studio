@@ -166,9 +166,8 @@ pre.out{background:var(--bg);border:1px solid var(--line);border-radius:8px;padd
         <button class="btn sm" id="clearMedia" type="button" style="align-self:flex-start">Remove media</button>
         <div class="row"><label>Language</label><select id="aLang"><option value="">Auto detect</option><option value="english">English</option><option value="hindi">Hindi</option><option value="urdu">Urdu</option></select>
           <select id="aModel"><option value="Xenova/whisper-tiny">Fast (tiny, ~40MB)</option><option value="Xenova/whisper-base">Better (base, ~80MB)</option></select></div>
-        <p class="note" id="asrStatus" style="margin:0">Check ho raha hai...</p>
         <button class="btn pri big" id="magicBtn" type="button">⚡ Generate Captions</button>
-        <p class="note" id="magicNote" style="margin:0">Video ya audio upload karo aur "Generate Captions" dabao. Bas.</p>
+        <p class="note" id="magicNote" style="margin:0">Video ya audio upload karo aur "Generate Captions" dabao. Pehli baar speech model download hoga (~40MB), wifi par karna. Bas.</p>
       </div>
 
       <details class="more"><summary>More ways (script, tap-sync, speak)</summary>
@@ -594,10 +593,10 @@ function renderFrame(g,W,H,st,t,cs,opt){
 const $=id=>document.getElementById(id);
 const stage=$('stage'),sctx=stage.getContext('2d');
 let t=0,playing=false,last=0,DUR=6,pxs=80,mediaFile=null,voiced=null,recBlob=null,fmtSel='srt';
-const MING=.04;
+const MING=.04;let capsSrc='';
 function toast(m){const e=$('toast');e.textContent=m;e.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>e.hidden=true,3200)}
-function save(){try{localStorage.setItem('capstudio.v3',JSON.stringify({S,caps}))}catch(e){}}
-function load(){try{const d=JSON.parse(localStorage.getItem('capstudio.v3')||'null');if(d&&d.S){Object.assign(S,d.S);caps=d.caps||[]}}catch(e){}}
+function save(){try{localStorage.setItem('capstudio.v4',JSON.stringify({S,caps}))}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem('capstudio.v4')||'null');if(d&&d.S){Object.assign(S,d.S);caps=d.caps||[]}}catch(e){}}
 const fmt=s=>{s=Math.max(0,s);const m=Math.floor(s/60);return m+':'+(s%60).toFixed(1).padStart(4,'0')};
 const srtT=(s,c)=>{const ms=Math.round(s*1000),h=Math.floor(ms/3600000),m=Math.floor(ms/60000)%60,x=Math.floor(ms/1000)%60,r=ms%1000;
  return[h,m,x].map(v=>String(v).padStart(2,'0')).join(':')+c+String(r).padStart(3,'0')};
@@ -680,14 +679,14 @@ function generate(quiet){
  const max=+$('gMax').value,wpm=+$('gWpm').value,gap=+$('gGap').value/100,chunks=splitScript(raw,max);
  let tm=.1;caps=chunks.map(tx=>{const n=tx.split(/\s+/).length,d=Math.max(.8,n*60/wpm);const c={start:tm,end:tm+d,text:tx};tm+=d+gap;return c});
  if($('gFit').checked&&MEDIA&&MEDIA.duration&&isFinite(MEDIA.duration)&&caps.length){const k=(MEDIA.duration-.2)/(caps[caps.length-1].end-.1);caps.forEach(c=>{c.start=.1+(c.start-.1)*k;c.end=.1+(c.end-.1)*k});fixGaps(gap)}
- sel=0;afterEdit();t=caps[0].start+Math.min(.9,(caps[0].end-caps[0].start)*.7);if(!quiet)toast(caps.length+' captions ban gaye');return true}
+ capsSrc='script';sel=0;afterEdit();t=caps[0].start+Math.min(.9,(caps[0].end-caps[0].start)*.7);if(!quiet)toast(caps.length+' captions ban gaye');return true}
 $('genBtn').onclick=()=>generate();
 function fixGaps(g){g=g===undefined?.12:g;for(let i=0;i<caps.length-1;i++){const lim=caps[i+1].start-g;if(caps[i].end>lim&&lim-caps[i].start>=.2)caps[i].end=lim}}
 $('gapCap').onclick=()=>{fixGaps(.12);afterEdit();toast('Captions ke beech gap daal diya')};
 $('gMax').oninput=e=>$('gMaxV').textContent=e.target.value;$('gWpm').oninput=e=>$('gWpmV').textContent=e.target.value;$('gGap').oninput=e=>$('gGapV').textContent=(e.target.value/100).toFixed(2)+'s';
 const smp=$('samples');Object.entries(SAMPLES).forEach(([n,s])=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent='Sample: '+n;
  b.onclick=()=>{$('script').value=s.t;S.font=s.font;const f=FONT_LIST.find(x=>x.name===s.font);if(f)loadFont(f);LC.clear();buildFonts();generate()};smp.appendChild(b)});
-$('script').oninput=()=>{try{localStorage.setItem('capstudio.script',$('script').value)}catch(e){}};
+$('script').oninput=()=>{try{localStorage.setItem('capstudio.script2',$('script').value)}catch(e){}};
 
 /* import / export */
 function parseSub(txt){const out=[];txt=txt.replace(/\r/g,'');
@@ -698,7 +697,7 @@ function importText(tx,name){let c=[];
  if(!c.length)c=parseSub(tx);
  if(!c.length&&tx.trim()){$('script').value=tx.trim();toast('Text script mein daal diya. "Captions banao" dabao.');showTab('script');return}
  if(!c.length){toast('Koi caption nahi mila');return}
- caps=c;sel=0;afterEdit();syncInputs();toast(c.length+' captions import ho gaye')}
+ caps=c;capsSrc='import';sel=0;afterEdit();syncInputs();toast(c.length+' captions import ho gaye')}
 $('srtBtn').onclick=()=>importText($('srtIn').value,'');
 $('subFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>importText(String(r.result),f.name);r.readAsText(f)};
 function exportText(k){const cs=caps.slice().sort((a,b)=>a.start-b.start);
@@ -719,7 +718,7 @@ $('savePng').onclick=()=>stage.toBlob(b=>b&&saveFile('caption-frame.png',b,'capt
 $('saveVid').onclick=()=>recBlob&&saveFile('captions.webm',recBlob,'captions.webm');
 
 /* ---------- media + auto-sync ---------- */
-$('mediaFile').onchange=e=>{const f=e.target.files[0];if(!f)return;mediaFile=f;voiced=null;const url=URL.createObjectURL(f);
+$('mediaFile').onchange=e=>{const f=e.target.files[0];if(!f)return;mediaFile=f;voiced=null;if(capsSrc==='whisper'||capsSrc==='script'&&!$('script').value.trim()){caps=[];sel=-1;capsSrc='';afterEdit()}const url=URL.createObjectURL(f);
  if(MEDIA&&MEDIA.pause)MEDIA.pause();
  if(f.type.startsWith('image/')){const im=new Image();im.onload=()=>{MEDIA=im;S.bg='media';syncInputs();recalcDur();buildTimeline()};im.src=url}
  else{const v=document.createElement(f.type.startsWith('audio/')?'audio':'video');v.src=url;v.playsInline=true;v.preload='auto';
@@ -788,27 +787,25 @@ async function transcribe(){
    ASR=await tf.pipeline('automatic-speech-recognition',model,{dtype:'q8',progress_callback:p=>{if(p&&p.status==='progress')note.textContent='Step 2/4: model download '+Math.round(p.progress||0)+'%'}});ASRNAME=model}
   step='audio decode';note.textContent='Step 3/4: awaaz tayyar ho rahi hai...';
   const data=await audio16k(mediaFile);
-  step='transcribe';note.textContent='Step 4/4: awaaz parh raha hoon (lambi video mein kuch minute lag sakte hain)...';
+  step='transcribe';const t0=Date.now();const iv=setInterval(()=>{note.textContent='Step 4/4: awaaz parh raha hoon... '+Math.round((Date.now()-t0)/1000)+' second (lambi video mein kuch minute lagte hain, page band mat karo)'},1000);note.textContent='Step 4/4: awaaz parh raha hoon...';
   const opt={return_timestamps:true,chunk_length_s:30,stride_length_s:5,task:'transcribe'};if(lang)opt.language=lang;
-  const out=await ASR(data,opt);
+  let out;try{out=await ASR(data,opt)}finally{clearInterval(iv)}
   const max=+$('gMax').value,gap=+$('gGap').value/100,res=[];
   (out.chunks||[]).forEach(ch=>{const tx=(ch.text||'').trim();if(!tx)return;const s0=(ch.timestamp&&ch.timestamp[0])||0,e0=(ch.timestamp&&ch.timestamp[1]!=null)?ch.timestamp[1]:s0+2;
    const parts=splitScript(tx,max),wc=parts.map(p=>p.split(/\s+/).length),W=wc.reduce((a,b)=>a+b,0);let a=0;
    parts.forEach((p,k)=>{const st=s0+(e0-s0)*a/W;a+=wc[k];const en=s0+(e0-s0)*a/W;res.push({start:st,end:Math.max(st+.3,en-gap),text:p})})});
   if(!res.length){note.textContent='Awaaz mein koi lafz nahi mila.';return false}
-  caps=res;sel=0;afterEdit();$('script').value=caps.map(c=>c.text).join(' ');
+  caps=res;capsSrc='whisper';sel=0;afterEdit();$('script').value='';
   note.textContent='Ho gaya: '+caps.length+' captions bane.';return true
  }catch(e){
   const msg=(e&&e.message)||String(e);
-  note.textContent='Auto Caption "'+step+'" par ruk gaya: '+msg+'. '+(step==='library load'||step==='model download'?'Ye tab hota hai jab internet na ho ya page viewer ke andar khula ho. HTML file download karke apne device ke Chrome mein kholo.':'Doosri video/audio file try karo (MP4, MP3 ya WAV).');return false}}
+  note.textContent='Auto Caption "'+step+'" par ruk gaya: '+msg+'. '+(step==='library load'||step==='model download'?'Internet check karo aur dobara Generate dabao. Agar aap ye page Claude ke andar dekh rahe ho to wahan ye nahi chalta, ye link kholo: https://rayanaliedu2025-boop.github.io/caption-studio/':'Doosri video/audio file try karo (MP4, MP3 ya WAV).');toast('Auto Caption nahi chala, upar wali line padho');return false}}
 $('magicBtn').onclick=async()=>{const b=$('magicBtn');b.disabled=true;
  try{
   let ok=false;const hasMedia=mediaFile&&!mediaFile.type.startsWith('image/'),hasScript=!!$('script').value.trim();
-  if(hasScript){ok=generate(true);if(ok&&hasMedia)await autoSync(true)}
-  else if(!hasMedia){toast('Pehle video ya audio upload karo');return}
-  else if(/✔/.test($('asrStatus').textContent))ok=await transcribe();
-  else if(DICT)ok=await listenCaption();
-  else{$('magicNote').textContent='Is viewer mein video se khud transcribe nahi ho sakta (network band hai, aur bolne wala option bhi yahan nahi). Script paste karo ya neeche "More ways" use karo.';toast('Yahan auto transcribe available nahi');return}
+  if(hasMedia&&!hasScript)ok=await transcribe();
+  else if(hasScript){ok=generate(true);if(ok&&hasMedia)await autoSync(true)}
+  else{toast('Pehle video ya audio upload karo');$('magicNote').textContent='Pehle upar "Choose File" se apni video ya audio chuno, phir Generate Captions dabao.';return}
   if(!ok)return;
   fixGaps(.1);afterEdit();showTab('files');refreshEx();t=caps[0]?caps[0].start:0;play();
   toast('Captions tayyar! Save karo ya video record karo.')
@@ -871,6 +868,7 @@ function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
  if(playing||recording){if(MEDIA&&MEDIA.currentTime!==undefined&&!MEDIA.paused&&!MEDIA.ended)t=MEDIA.currentTime;else t+=dt;
   if(t>=DUR){if(recording||dictOn||tapOn){t=DUR;if(dictOn&&DICT)DICT.stop()}else if($('loopChk').checked){t=0;if(MEDIA&&MEDIA.currentTime!==undefined){MEDIA.currentTime=0;MEDIA.play().catch(()=>{})}}else{t=DUR;pause()}}}
  renderFrame(sctx,stage.width,stage.height,S,t,caps);
+ if(!caps.length){sctx.save();sctx.fillStyle='rgba(255,255,255,.75)';sctx.textAlign='center';sctx.font=`600 ${stage.width*.045}px Inter,system-ui,sans-serif`;const ls=MEDIA?['Ab "Generate Captions"','dabao']:['Pehle video upload karo,','phir "Generate Captions" dabao'];ls.forEach((l,k)=>sctx.fillText(l,stage.width/2,stage.height*.5+k*stage.width*.07));sctx.restore()}
  $('timeLbl').textContent=fmt(t)+' / '+fmt(DUR);head.style.left=t*pxs+'px';
  if(playing){const sc=$('tlscroll'),x=t*pxs;if(x>sc.scrollLeft+sc.clientWidth-30||x<sc.scrollLeft)sc.scrollLeft=Math.max(0,x-40)}
  drawThumbs(now);requestAnimationFrame(tick)}
@@ -891,10 +889,10 @@ $('themeBtn').onclick=()=>{const r=document.documentElement,cur=r.dataset.theme|
 
 /* ---------- boot ---------- */
 load();if(!P[S.preset])S.preset='k-bounce';
-try{$('script').value=localStorage.getItem('capstudio.script')||SAMPLES['English'].t}catch(e){$('script').value=SAMPLES['English'].t}
+try{$('script').value=localStorage.getItem('capstudio.script2')||''}catch(e){}
 setAspect(ASPECTS[S.aspect]?S.aspect:'9:16');
-if(!caps.length)generate(true);else{sel=0;buildTimeline();buildList()}
-syncInputs();markCards();checkAsr();$('gGapV').textContent='0.15s';
+sel=caps.length?0:-1;buildTimeline();buildList();
+syncInputs();markCards();$('gGapV').textContent='0.15s';
 window.addEventListener('resize',buildTimeline);try{document.fonts.addEventListener('loadingdone',()=>LC.clear())}catch(e){}
 requestAnimationFrame(n=>{last=n;tick(n)});
 </script>
