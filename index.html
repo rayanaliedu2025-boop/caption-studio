@@ -164,8 +164,8 @@ pre.out{background:var(--bg);border:1px solid var(--line);border-radius:8px;padd
       <div class="sec box" style="border-color:var(--accent)"><h3>Auto Captions</h3>
         <input type="file" id="mediaFile" accept="video/*,audio/*,image/*">
         <button class="btn sm" id="clearMedia" type="button" style="align-self:flex-start">Remove media</button>
-        <div class="row"><label>Language</label><select id="aLang"><option value="">Auto detect</option><option value="english">English</option><option value="hindi">Hindi</option><option value="urdu">Urdu</option></select>
-          <select id="aModel"><option value="Xenova/whisper-tiny">Fast (tiny, ~40MB)</option><option value="Xenova/whisper-base">Better (base, ~80MB)</option></select></div>
+        <div class="row"><label>Language</label><select id="aLang"><option value="roman" selected>Urdu / Hindi → Roman Urdu</option><option value="english">English</option><option value="">Auto detect</option><option value="hindi">Hindi (Devanagari)</option><option value="urdu">Urdu (Arabic script)</option></select>
+          <select id="aModel"><option value="Xenova/whisper-tiny">Fast (tiny, ~40MB)</option><option value="Xenova/whisper-base" selected>Better (base, ~80MB)</option><option value="Xenova/whisper-small">Best (small, ~250MB, slow)</option></select></div>
         <button class="btn pri big" id="magicBtn" type="button">⚡ Generate Captions</button>
         <p class="note" id="magicNote" style="margin:0">Video ya audio upload karo aur "Generate Captions" dabao. Pehli baar speech model download hoga (~40MB), wifi par karna. Bas.</p>
       </div>
@@ -272,6 +272,7 @@ pre.out{background:var(--bg);border:1px solid var(--line);border-radius:8px;padd
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+
 <script>
 'use strict';
 /* ---------- fonts (61, loaded lazily from Google Fonts; * = has bold) ---------- */
@@ -777,6 +778,39 @@ async function audio16k(file){const AC=window.AudioContext||window.webkitAudioCo
  const oc=new OfflineAudioContext(1,Math.ceil(ab.duration*16000),16000),src=oc.createBufferSource();src.buffer=ab;src.connect(oc.destination);src.start();return(await oc.startRendering()).getChannelData(0)}
 async function checkAsr(){const el=$('asrStatus');try{const c=new AbortController();setTimeout(()=>c.abort(),7000);await fetch('https://huggingface.co/Xenova/whisper-tiny/resolve/main/config.json',{method:'HEAD',signal:c.signal});
  el.textContent='✔ Auto Caption yahan chal sakta hai (internet mil raha hai).'}catch(e){el.textContent='✖ Yahan model download nahi ho sakta (Claude viewer network band rakhta hai, ya internet nahi). Bheji hui HTML file download karke apne device ke Chrome mein kholo, phir ye chalega.'}}
+
+/* ---------- Devanagari -> Roman Urdu ---------- */
+const DV={C:{'क':'k','ख':'kh','ग':'g','घ':'gh','ङ':'ng','च':'ch','छ':'chh','ज':'j','झ':'jh','ञ':'n','ट':'t','ठ':'th','ड':'d','ढ':'dh','ण':'n','त':'t','थ':'th','द':'d','ध':'dh','न':'n','प':'p','फ':'f','ब':'b','भ':'bh','म':'m','य':'y','र':'r','ल':'l','व':'w','श':'sh','ष':'sh','स':'s','ह':'h','क़':'q','ख़':'kh','ग़':'gh','ज़':'z','ड़':'r','ढ़':'rh','फ़':'f'},
+ V:{'अ':'a','आ':'a','इ':'i','ई':'ee','उ':'u','ऊ':'oo','ए':'e','ऐ':'ai','ओ':'o','औ':'au','ऑ':'o','ऋ':'ri'},
+ M:{'ा':'a','ि':'i','ी':'ee','ु':'u','ू':'oo','े':'e','ै':'ai','ो':'o','ौ':'au','ॉ':'o','ृ':'ri'}};
+const DW={'में':'mein','मैं':'main','है':'hai','हैं':'hain','नहीं':'nahi','और':'aur','क्या':'kya','यह':'yeh','ये':'ye','वह':'woh','वो':'wo','कि':'ke','को':'ko','का':'ka','की':'ki','के':'ke','से':'se','पर':'par','तो':'to','भी':'bhi','ही':'hi','जो':'jo','था':'tha','थे':'the','थी':'thi','हो':'ho','हम':'hum','तुम':'tum','आप':'aap','मेरा':'mera','मेरी':'meri','मेरे':'mere','यहाँ':'yahan','वहाँ':'wahan','कहाँ':'kahan','कैसे':'kaise','क्यों':'kyun','ऐसा':'aisa','अब':'ab','जी':'ji','हाँ':'haan'};
+function dvWord(w){
+ if(DW[w])return DW[w];
+ w=w.replace(/([क-ज़ढ])़/g,(m,c)=>DV.C[c+'़']?c+'़':c);
+ const u=[];const ch=Array.from(w.normalize('NFC'));
+ for(let i=0;i<ch.length;i++){let c=ch[i];
+  if(ch[i+1]==='़'&&DV.C[c+'़']){c=c+'़';i++}
+  if(DV.C[c]!==undefined){const o={t:'c',r:DV.C[c],a:true};
+   while(i+1<ch.length){const n=ch[i+1];
+    if(n==='्'){o.a=false;o.vi=true;i++;break}
+    if(DV.M[n]){o.r+=DV.M[n];o.a=false;i++;continue}
+    if(n==='ं'||n==='ँ'){o.r+=(o.a?'a':'')+'n';o.a=false;i++;continue}
+    if(n==='ः'){o.r+=(o.a?'a':'')+'h';o.a=false;i++;continue}
+    break}
+   u.push(o)}
+  else if(DV.V[c]!==undefined){let r=DV.V[c];while(i+1<ch.length&&(ch[i+1]==='ं'||ch[i+1]==='ँ')){r+='n';i++}u.push({t:'v',r,a:false})}
+  else if(c==='।'||c==='॥')u.push({t:'x',r:'.',a:false});
+  else if(c>='०'&&c<='९')u.push({t:'x',r:String(c.charCodeAt(0)-0x966),a:false});
+  else u.push({t:'x',r:c,a:false})}
+ let out='';
+ u.forEach((o,k)=>{let r=o.r;
+  if(o.t==='c'&&o.a){const last=k===u.length-1,nxt=u[k+1];
+   const del=last||(k>0&&nxt&&nxt.t==='c'&&!nxt.a&&!nxt.vi);
+   r+=del?'':'a'}
+  out+=r});
+ return out}
+function toRoman(t){if(!/[ऀ-ॿ]/.test(t))return t;
+ let r=t.replace(/[ऀ-ॿ]+/g,w=>dvWord(w));r=r.replace(/\s+/g,' ').trim();return r.charAt(0).toUpperCase()+r.slice(1)}
 async function transcribe(){
  if(!mediaFile||mediaFile.type.startsWith('image/')){toast('Pehle video ya audio daalo');return false}
  const note=$('magicNote'),model=$('aModel').value,lang=$('aLang').value;let step='library load';
@@ -792,10 +826,10 @@ async function transcribe(){
   step='audio decode';note.textContent='Step 3/4: awaaz tayyar ho rahi hai...';
   const data=await audio16k(mediaFile);
   step='transcribe';const t0=Date.now();const iv=setInterval(()=>{note.textContent='Step 4/4: awaaz parh raha hoon... '+Math.round((Date.now()-t0)/1000)+' second (lambi video mein kuch minute lagte hain, page band mat karo)'},1000);note.textContent='Step 4/4: awaaz parh raha hoon...';
-  const opt={return_timestamps:true,chunk_length_s:30,stride_length_s:5,task:'transcribe'};if(lang)opt.language=lang;
+  const opt={return_timestamps:true,chunk_length_s:30,stride_length_s:5,task:'transcribe'};const roman=lang==='roman';if(roman)opt.language='hindi';else if(lang)opt.language=lang;
   let out;try{out=await ASR(data,opt)}finally{clearInterval(iv)}
   const max=+$('gMax').value,gap=+$('gGap').value/100,res=[];
-  (out.chunks||[]).forEach(ch=>{const tx=(ch.text||'').trim();if(!tx)return;const s0=(ch.timestamp&&ch.timestamp[0])||0,e0=(ch.timestamp&&ch.timestamp[1]!=null)?ch.timestamp[1]:s0+2;
+  (out.chunks||[]).forEach(ch=>{let tx=(ch.text||'').trim();if(!tx)return;if(roman)tx=toRoman(tx);const s0=(ch.timestamp&&ch.timestamp[0])||0,e0=(ch.timestamp&&ch.timestamp[1]!=null)?ch.timestamp[1]:s0+2;
    const parts=splitScript(tx,max),wc=parts.map(p=>p.split(/\s+/).length),W=wc.reduce((a,b)=>a+b,0);let a=0;
    parts.forEach((p,k)=>{const st=s0+(e0-s0)*a/W;a+=wc[k];const en=s0+(e0-s0)*a/W;res.push({start:st,end:Math.max(st+.3,en-gap),text:p})})});
   if(!res.length){note.textContent='Awaaz mein koi lafz nahi mila.';return false}
