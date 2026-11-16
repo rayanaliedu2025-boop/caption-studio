@@ -589,6 +589,7 @@ function renderFrame(g,W,H,st,t,cs,opt){
   }
  }
  G.restore()}
+
 /* ---------- UI (Roman Urdu) ---------- */
 const $=id=>document.getElementById(id);
 const stage=$('stage'),sctx=stage.getContext('2d');
@@ -771,7 +772,7 @@ function listenCaption(){return new Promise(res=>{dictDone=res;$('magicNote').te
 
 /* ---------- ek click: awaaz se khud transcribe (Whisper, device par) ---------- */
 let ASR=null,ASRNAME='';
-async function loadTF(){const base='https://cdn.jsdelivr.net/npm/@huggingface/transformers';let err;for(const v of ['@3.5.1','@3.7.6','']){try{return await import(base+v)}catch(e){err=e}}throw err}
+async function loadTF(){const base='https://cdn.jsdelivr.net/npm/@huggingface/transformers';let err;for(const v of ['@3.5.1','@3.7.6','']){try{return await import(base+v)}catch(e){err=e}}try{return await import('https://esm.sh/@huggingface/transformers@3.5.1')}catch(e){err=e}throw err}
 async function audio16k(file){const AC=window.AudioContext||window.webkitAudioContext,ac=new AC(),ab=await ac.decodeAudioData(await file.arrayBuffer());ac.close&&ac.close();
  const oc=new OfflineAudioContext(1,Math.ceil(ab.duration*16000),16000),src=oc.createBufferSource();src.buffer=ab;src.connect(oc.destination);src.start();return(await oc.startRendering()).getChannelData(0)}
 async function checkAsr(){const el=$('asrStatus');try{const c=new AbortController();setTimeout(()=>c.abort(),7000);await fetch('https://huggingface.co/Xenova/whisper-tiny/resolve/main/config.json',{method:'HEAD',signal:c.signal});
@@ -783,8 +784,11 @@ async function transcribe(){
   note.textContent='Step 1/4: speech library load ho rahi hai...';
   const tf=await loadTF();const env=tf.env;env.allowLocalModels=false;try{env.backends.onnx.wasm.numThreads=1}catch(e){}if(typeof caches==='undefined')env.useBrowserCache=false;
   step='model download';
-  if(!ASR||ASRNAME!==model){note.textContent='Step 2/4: model download ho raha hai (pehli baar)...';
-   ASR=await tf.pipeline('automatic-speech-recognition',model,{dtype:'q8',progress_callback:p=>{if(p&&p.status==='progress')note.textContent='Step 2/4: model download '+Math.round(p.progress||0)+'%'}});ASRNAME=model}
+  if(!ASR||ASRNAME!==model){const hosts=['https://huggingface.co/','https://hf-mirror.com/'],fails=[];
+   for(const h of hosts){try{note.textContent='Step 2/4: model download ho raha hai ('+h.replace('https://','').replace('/','')+')...';env.remoteHost=h;
+    ASR=await tf.pipeline('automatic-speech-recognition',model,{dtype:'q8',progress_callback:p=>{if(p&&p.status==='progress')note.textContent='Step 2/4: model download '+Math.round(p.progress||0)+'% ('+h.replace('https://','').replace('/','')+')'}});ASRNAME=model;break}
+    catch(e){fails.push(h.replace('https://','').replace('/','')+': '+((e&&e.message)||e))}}
+   if(!ASR)throw new Error('Model kisi bhi server se nahi aaya ['+fails.join(' | ')+']. Aapka internet/ISP ye sites block kar raha hai, VPN ya doosra network (WiFi/mobile data) try karo')}
   step='audio decode';note.textContent='Step 3/4: awaaz tayyar ho rahi hai...';
   const data=await audio16k(mediaFile);
   step='transcribe';const t0=Date.now();const iv=setInterval(()=>{note.textContent='Step 4/4: awaaz parh raha hoon... '+Math.round((Date.now()-t0)/1000)+' second (lambi video mein kuch minute lagte hain, page band mat karo)'},1000);note.textContent='Step 4/4: awaaz parh raha hoon...';
@@ -895,4 +899,5 @@ sel=caps.length?0:-1;buildTimeline();buildList();
 syncInputs();markCards();$('gGapV').textContent='0.15s';
 window.addEventListener('resize',buildTimeline);try{document.fonts.addEventListener('loadingdone',()=>LC.clear())}catch(e){}
 requestAnimationFrame(n=>{last=n;tick(n)});
+
 </script>
