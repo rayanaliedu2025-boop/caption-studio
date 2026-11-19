@@ -229,6 +229,11 @@ pre.out{background:var(--bg);border:1px solid var(--line);border-radius:8px;padd
       </div>
     </div>
 
+    <div class="pane" id="pane-simple" hidden>
+      <p class="note" style="margin:0">Simple captions: seedhe saaf styles jo har caption app mein hoti hain (outline, box, bar, karaoke). Kisi par tap karo, lag jayega. Rang Style tab se badalte hain.</p>
+      <div id="cardsS"></div>
+    </div>
+
     <div class="pane" id="pane-kinetic" hidden>
       <p class="note" style="margin:0">Kinetic captions mein sirf text harkat karta hai (lafz ya harf apni jagah se animate hote hain). Kisi par tap karo, lag jayega.</p>
       <div id="cardsK"></div>
@@ -368,8 +373,9 @@ function layout(st,text,W,single){
  const L={units,lines:lineBoxes,w:maxLW,h:lines.length*lh,fs,rtl,cplx,lh};LC.set(key,L);return L}
 
 /* ---------- presets ---------- */
-const P={};const PK=[],PM=[];
+const P={};const PK=[],PM=[],PS=[];
 function K(id,name,o){o.id='k-'+id;o.name=name;o.type='k';o.mode=o.mode||'line';o.unit=o.unit||'word';P[o.id]=o;PK.push(o)}
+function SI(id,name,cat,o){o.id='s-'+id;o.name=name;o.cat=cat;o.type='s';o.mode='line';o.unit=o.unit||'word';o.stg=o.stg===undefined?.06:o.stg;P[o.id]=o;PS.push(o)}
 function M(id,name,o){o.id='m-'+id;o.name=name;o.type='m';o.mode='line';o.unit=o.unit||'word';o.stg=o.stg===undefined?.06:o.stg;P[o.id]=o;PM.push(o)}
 
 
@@ -412,6 +418,26 @@ K('waveform','Waveform',{desc:'Audio-reactive vertical bar expansion tied to spe
  fx:(box,tin,o)=>{const N=26,bw=box.w/(N*1.7),by=box.y+box.h+o.fs*.6,am=ampAt(o.t);G.fillStyle=o.st.accent;for(let k=0;k<N;k++){const x=box.x+(k+.5)*box.w/N,h=o.fs*.1+o.fs*(.15+.95*am*(.35+.65*Math.abs(Math.sin(k*1.7+o.t*9+seed(k)*6))));rrect(x-bw/2,by-h/2,bw,h,bw/2);G.fill()}}});
 K('blurfade','Smooth Blur Fade',{desc:'Gaussian blur de-focus transition sharpening into crystal clarity.',stg:.08,dur:.8,fn:p=>{const e=E.io(p);return T({a:e,blur:(1-e)*22,sx:1.06-.06*e,sy:1.06-.06*e})}});
 K('skew','Dynamic Skew',{desc:'Dynamic diagonal shearing skew effect that straightens out on settle.',stg:.06,dur:.75,fn:(p,i,n,o)=>T({a:Math.min(1,p*5),skew:-.75*Math.exp(-p*5)*Math.cos(p*Math.PI*2.5),dx:-(1-E.cubic(p))*o.fs*1.4})});
+
+
+/* ---------- simple captions (the classic styles every caption maker has) ---------- */
+const bx=(fill,rad,pd)=>(b,p,o)=>{G.globalAlpha*=E.cubic(p);G.fillStyle=fill(o);rrect(b.x-(pd||0)*o.fs,b.y-(pd||0)*o.fs*.4,b.w+(pd||0)*o.fs*2,b.h+(pd||0)*o.fs*.8,b.h*rad);G.fill()};
+const still=()=>T({});
+SI('classic','Classic','Classic',{all:1,fn:still,desc:'White text with a black outline. Works on every video.'});
+SI('yellow','Yellow Subtitle','Classic',{all:1,tc:'accent',fn:still,desc:'Accent-colour (yellow) text with a black outline, like movie subtitles.'});
+SI('shadow','Soft Shadow','Classic',{all:1,style:{stroke:0,sh:2.2},fn:still,desc:'No outline, just a soft drop shadow.'});
+SI('minimal','Clean Minimal','Classic',{all:1,style:{stroke:0,sh:.5},fn:(p,i,n,o)=>T({a:1,dy:(1-E.cubic(clamp(o.tin/.35)))*o.fs*.2}),desc:'Thin and clean, gentle slide-up.'});
+SI('thick','Thick Outline','Classic',{all:1,style:{stroke:13},fn:still,desc:'Extra-thick outline for busy backgrounds.'});
+SI('hollow','Hollow Outline','Classic',{all:1,style:{hollow:1,sh:0},fn:still,desc:'See-through letters with only an outline.'});
+SI('upper','Uppercase Bold','Classic',{all:1,upper:1,style:{stroke:9},fn:still,desc:'ALL CAPS, bold with a thick outline.'});
+SI('blackbox','Black Box','Boxes & Bars',{all:1,tc:'light',style:{stroke:0,sh:0},g:bx(()=>'rgba(0,0,0,.72)',.2,.3),fn:still,desc:'White text on a dark rounded box.'});
+SI('whitebox','White Box','Boxes & Bars',{all:1,tc:'dark',style:{stroke:0,sh:0},g:bx(()=> '#ffffff',.2,.3),fn:still,desc:'Dark text on a white rounded box.'});
+SI('accentbox','Accent Box','Boxes & Bars',{all:1,tc:'acc',style:{stroke:0,sh:0},g:bx(o=>o.st.accent,.2,.3),fn:still,desc:'Text on a box in your accent colour.'});
+SI('bar','Full-width Bar','Boxes & Bars',{all:1,tc:'light',style:{stroke:0,sh:0},g:(b,p,o)=>{G.globalAlpha*=E.cubic(p);G.fillStyle='rgba(0,0,0,.75)';G.fillRect(-o.W/2,b.y-o.fs*.15,o.W,b.h+o.fs*.3)},fn:still,desc:'A dark strip across the whole screen width.'});
+SI('underline','Underlined','Boxes & Bars',{all:1,g:(b,p,o)=>{const e=E.cubic(p),w=b.w*.92*e;G.fillStyle=o.st.accent;rrect(-w/2,b.y+b.h-o.fs*.02,w,Math.max(4*SC,o.fs*.08),o.fs*.04);G.fill()},fn:still,desc:'Plain text with an accent line underneath.'});
+SI('karaoke','Karaoke Highlight','Word Highlight',{all:1,fn:(p,i,n,o)=>T({color:o.act?o.st.accent:null}),desc:'The word being spoken lights up in your accent colour.'});
+SI('wordpop','Active Word Pop','Word Highlight',{all:1,fn:(p,i,n,o)=>{const s=o.act?1.14:1;return T({color:o.act?o.st.accent:null,sx:s,sy:s})},desc:'The spoken word grows slightly and changes colour.'});
+SI('wordbyword','Word by Word','Word Highlight',{timed:1,fn:p=>T({a:E.cubic(p)}),desc:'Words appear one by one as they are spoken.'});
 
 const gr=(b,p)=>G.createLinearGradient(b.x,0,b.x+b.w,0);
 M('lower','Lower Third',{tc:'acc',g:(b,p,o)=>{const e=E.cubic(p);G.fillStyle=o.st.accent;G.fillRect(b.x,b.y,b.w*e,b.h);G.fillStyle=o.st.text;G.fillRect(b.x,b.y+b.h,b.w*e,7*SC)},fn:(p,i,n,o)=>{const e=E.cubic(p);return T({a:e,dx:(1-e)*-o.fs})}});
@@ -508,7 +534,9 @@ function paintText(str,col,st,fs,sty,tr){
  const sw=(sty.stroke!==undefined?sty.stroke:st.strokeW)*SC;
  G.lineJoin='round';G.miterLimit=2;
  if(sty.extrude){G.fillStyle=st.accent;for(let k=14;k>=1;k--)G.fillText(str,k*.9*SC,k*.9*SC);G.strokeStyle=st.stroke}
- if(st.shadow&&!sty.neon){G.shadowColor='rgba(0,0,0,.5)';G.shadowBlur=14*SC;G.shadowOffsetY=5*SC}
+ if(sty.hollow){G.strokeStyle=col;G.lineWidth=Math.max(2.5*SC,fs*.04);G.strokeText(str,0,0);return}
+ const shv=sty.sh!==undefined?sty.sh:(st.shadow?1:0);
+ if(shv>0&&!sty.neon){G.shadowColor='rgba(0,0,0,'+Math.min(.9,.5*shv)+')';G.shadowBlur=14*SC*shv;G.shadowOffsetY=5*SC*shv}
  if(sty.neon){G.shadowColor=st.accent;G.shadowBlur=26*SC*((tr&&tr.glow)||1);G.fillStyle='#fff';G.fillText(str,0,0);G.fillText(str,0,0);G.shadowBlur=8*SC;G.fillText(str,0,0);return}
  if(sw>0){G.strokeStyle=st.stroke;G.lineWidth=sw*2;G.strokeText(str,0,0);G.shadowColor='transparent'}
  if(sty.grad){const gg=G.createLinearGradient(0,-fs/2,0,fs/2);gg.addColorStop(0,'#fff');gg.addColorStop(1,st.accent);G.fillStyle=gg}else G.fillStyle=col;
@@ -532,7 +560,7 @@ function renderFrame(g,W,H,st,t,cs,opt){
   const wt=wordTimes(cap);let act=wt.findIndex(w=>t>=w.s&&t<w.e);if(act<0)act=t>=wt[wt.length-1].e?wt.length-1:0;
   const tin=(t-cap.start)*sp-(pr.delay||0),ex=clamp((cap.end-t)/.22);
   G.translate(W/2,ay);
-  let col=st.text;if(pr.tc==='acc')col=onColor(st.accent);else if(pr.tc==='dark')col='#141414';else if(pr.tc==='light')col='#ffffff';
+  let col=st.text;if(pr.tc==='accent')col=st.accent;else if(pr.tc==='acc')col=onColor(st.accent);else if(pr.tc==='dark')col='#141414';else if(pr.tc==='light')col='#ffffff';
   const stt=pr.tc?Object.assign({},st,{stroke:st.stroke}):st;
   let gA=1,gS=1,gR=0,gx=0,gy=0;
   if(pr.grp){const q=pr.grp(clamp(tin/.5));gA=q.a===undefined?1:q.a;gS=q.s||1;gR=q.r||0;gy=q.dy||0}
@@ -606,7 +634,7 @@ function recalcDur(){let e=0;caps.forEach(c=>e=Math.max(e,c.end));const md=(MEDI
 const PN={};
 
 /* tabs */
-const TABS=[['script','Captions'],['style','Style'],['kinetic','Kinetic'],['motion','Motion'],['anim','Animations'],['files','Files']];
+const TABS=[['script','Captions'],['style','Style'],['simple','Simple'],['kinetic','Kinetic'],['motion','Motion'],['anim','Animations'],['files','Files']];
 const tabsEl=$('tabs');
 TABS.forEach(([id,n],i)=>{const b=document.createElement('button');b.className='tab';b.type='button';b.setAttribute('role','tab');b.textContent=n;b.setAttribute('aria-selected',i===0);b.onclick=()=>showTab(id);b.dataset.id=id;tabsEl.appendChild(b)});
 let curTab='script';
@@ -650,7 +678,7 @@ function buildCards(list,host){const cats=[...new Set(list.map(p=>p.cat))];
  list.filter(p=>p.cat===cat).forEach(p=>{const b=document.createElement('button');b.type='button';b.className='card';b.setAttribute('aria-pressed',S.preset===p.id);
  if(p.desc)b.title=p.desc;const c=document.createElement('canvas');c.width=240;c.height=135;b.appendChild(c);const s=document.createElement('span');s.textContent=p.name;b.appendChild(s);
  b.onclick=()=>{S.preset=p.id;markCards();save();const c0=caps[Math.max(0,sel)];if(c0){t=c0.start}};g.appendChild(b);thumbs.push({c,p,b})})})}
-buildCards(PK,$('cardsK'));buildCards(PM,$('cardsM'));
+buildCards(PS,$('cardsS'));buildCards(PK,$('cardsK'));buildCards(PM,$('cardsM'));
 function buildAnimCards(host){const cats=[...new Set(AN.map(a=>a.cat))];
  cats.forEach(cat=>{const h=document.createElement('div');h.className='cathead';h.textContent=cat;host.appendChild(h);const g=document.createElement('div');g.className='cards';host.appendChild(g);
   AN.filter(a=>a.cat===cat).forEach(a=>{const b=document.createElement('button');b.type='button';b.className='card';b.setAttribute('aria-pressed',S.anim===a.id);
@@ -660,7 +688,7 @@ buildAnimCards($('cardsA'));
 function markCards(){thumbs.forEach(x=>x.b.setAttribute('aria-pressed',x.p.type==='a'?S.anim===x.p.id:S.preset===x.p.id))}
 const TH_CAP=[{start:0,end:2.6,text:'Make it move'}],TH_A=[{start:0,end:2.4,text:'Abc'}];let thLast=0;
 function drawThumbs(now){if(now-thLast<66)return;thLast=now;
- const pane=curTab==='kinetic'?'k':curTab==='motion'?'m':curTab==='anim'?'a':null;if(!pane)return;
+ const pane=curTab==='simple'?'s':curTab==='kinetic'?'k':curTab==='motion'?'m':curTab==='anim'?'a':null;if(!pane)return;
  thumbs.forEach(x=>{if(x.p.type!==pane)return;const r=x.c.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)return;
   const bg=S.bg==='media'||S.bg==='chroma'?'gradient':S.bg;
   if(pane==='a'){const tt=(now/1000)%2.4;renderFrame(x.c.getContext('2d'),240,135,Object.assign({},S,{preset:'k-static',anim:x.p.id,exit:'none',size:250,strokeW:S.strokeW*.8,posY:52,maxW:94,bg}),tt,TH_A,{thumb:1})}
