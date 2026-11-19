@@ -168,6 +168,8 @@ pre.out{background:var(--bg);border:1px solid var(--line);border-radius:8px;padd
           <select id="aModel"><option value="Xenova/whisper-tiny">Fast (tiny, ~40MB)</option><option value="Xenova/whisper-base" selected>Better (base, ~80MB)</option><option value="Xenova/whisper-small">Best (small, ~250MB, slow)</option></select></div>
         <button class="btn pri big" id="magicBtn" type="button">⚡ Generate Captions</button>
         <p class="note" id="magicNote" style="margin:0">Video ya audio upload karo aur "Generate Captions" dabao. Pehli baar speech model download hoga (~40MB), wifi par karna. Bas.</p>
+        <div class="row" style="margin-top:6px"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="silOn" checked> Hide captions during silence</label><button class="btn sm" id="speechFitBtn" type="button">Fit to speech</button></div>
+        <p class="note" style="margin:0">Jahan bolne wala chup ho jata hai wahan caption fade out ho jata hai, aur naya lafz bolte hi dobara aata hai. Auto caption ke baad ye khud lagta hai. Pehle se bani captions par "Fit to speech" dabao.</p>
       </div>
 
       <details class="more"><summary>More ways (script, tap-sync, speak)</summary>
@@ -771,7 +773,7 @@ async function autoSync(quiet){
  const wc=caps.map(c=>c.text.trim().split(/\s+/).length),W=wc.reduce((a,b)=>a+b,0);let acc=0;
  caps.forEach((c,i)=>{const f0=acc/W,f1=(acc+wc[i])/W;acc+=wc[i];c.start=map(f0*tot);c.end=Math.max(c.start+.35,map(f1*tot))});
  for(let i=0;i<caps.length-1;i++)if(caps[i].end>caps[i+1].start-.04)caps[i].end=Math.max(caps[i].start+.2,caps[i+1].start-.08);
- $('syncNote').textContent='Sync ho gaya: '+sp.length+' awaaz ke hisse mile.';afterEdit();t=caps[0].start;if(!quiet)toast('Captions awaaz se match ho gaye');return true}
+ $('syncNote').textContent='Sync ho gaya: '+sp.length+' awaaz ke hisse mile.';if($('silOn').checked)fitToSpeech(true);afterEdit();t=caps[0].start;if(!quiet)toast('Captions awaaz se match ho gaye');return true}
 $('syncBtn').onclick=()=>autoSync();
 function drawWave(){const c=$('wave');c.width=Math.max(1,Math.floor($('tlin').clientWidth));const g=c.getContext('2d');g.clearRect(0,0,c.width,22);
  if(!voiced)return;g.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--mute')||'#888';
@@ -839,6 +841,27 @@ function dvWord(w){
  return out}
 function toRoman(t){if(!/[ऀ-ॿ]/.test(t))return t;
  let r=t.replace(/[ऀ-ॿ]+/g,w=>dvWord(w));r=r.replace(/\s+/g,' ').trim();return r.charAt(0).toUpperCase()+r.slice(1)}
+
+/* ---------- captions follow speech: hide during silence ---------- */
+function fitToSpeech(quiet){
+ if(!voiced||!voiced.spans.length||!caps.length){if(!quiet)toast('Pehle video/audio daalo aur captions banao');return false}
+ const GAP=.55,sp=voiced.spans,out=[];let split=0,trim=0;
+ caps.slice().sort((a,b)=>a.start-b.start).forEach(c=>{
+  const words=c.text.trim().split(/\s+/).filter(Boolean),pcs=[];
+  sp.forEach(s=>{const a=Math.max(s.s,c.start),b=Math.min(s.e,c.end);if(b-a>.08)pcs.push({s:a,e:b})});
+  if(!pcs.length||!words.length){out.push(c);return}
+  const cl=[];pcs.forEach(p=>{const L=cl[cl.length-1];if(L&&p.s-L.e<GAP){L.e=p.e;L.d+=p.e-p.s}else cl.push({s:p.s,e:p.e,d:p.e-p.s})});
+  while(cl.length>words.length){let k=0,g=1e9;for(let i=0;i<cl.length-1;i++){const gg=cl[i+1].s-cl[i].e;if(gg<g){g=gg;k=i}}cl[k].e=cl[k+1].e;cl[k].d+=cl[k+1].d;cl.splice(k+1,1)}
+  const tot=cl.reduce((a,x)=>a+x.d,0)||1;let wi=0,acc=0;
+  cl.forEach((x,i)=>{acc+=x.d;const upto=i===cl.length-1?words.length:Math.max(wi+1,Math.min(words.length-(cl.length-1-i),Math.round(words.length*acc/tot)));
+   out.push({start:Math.max(0,x.s-.05),end:x.e+.12,text:words.slice(wi,upto).join(' ')});wi=upto});
+  if(cl.length>1)split++;else trim++});
+ out.sort((a,b)=>a.start-b.start);
+ for(let i=0;i<out.length-1;i++)if(out[i].end>out[i+1].start-.02)out[i].end=Math.max(out[i].start+.2,out[i+1].start-.02);
+ caps=out;sel=Math.min(Math.max(sel,0),caps.length-1);afterEdit();
+ if(!quiet)toast('Ho gaya: '+split+' captions chup par toot gayi, '+trim+' ki timing tight hui');return true}
+$('speechFitBtn').onclick=async()=>{if(!mediaFile||mediaFile.type.startsWith('image/')){toast('Pehle video ya audio daalo');return}
+ if(!voiced){try{voiced=await analyseAudio()}catch(e){toast('Awaaz decode nahi hui');return}}fitToSpeech()};
 async function transcribe(){
  if(!mediaFile||mediaFile.type.startsWith('image/')){toast('Pehle video ya audio daalo');return false}
  const note=$('magicNote'),model=$('aModel').value,lang=$('aLang').value;let step='library load';
@@ -861,7 +884,7 @@ async function transcribe(){
    const parts=splitScript(tx,max),wc=parts.map(p=>p.split(/\s+/).length),W=wc.reduce((a,b)=>a+b,0);let a=0;
    parts.forEach((p,k)=>{const st=s0+(e0-s0)*a/W;a+=wc[k];const en=s0+(e0-s0)*a/W;res.push({start:st,end:Math.max(st+.3,en-gap),text:p})})});
   if(!res.length){note.textContent='Awaaz mein koi lafz nahi mila.';return false}
-  caps=res;capsSrc='whisper';sel=0;afterEdit();$('script').value='';
+  caps=res;capsSrc='whisper';sel=0;if($('silOn').checked){try{if(!voiced)voiced=await analyseAudio();fitToSpeech(true)}catch(e){}}afterEdit();$('script').value='';
   note.textContent='Ho gaya: '+caps.length+' captions bane.';return true
  }catch(e){
   const msg=(e&&e.message)||String(e);
